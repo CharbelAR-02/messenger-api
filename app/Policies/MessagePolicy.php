@@ -51,4 +51,9 @@ class MessagePolicy
     {
         return $this->isActiveParticipant($user, $message);
     }
+
+    public function react(User $user, Message $message): bool
+    {
+        return $this->isActiveParticipant($user, $message);
+    }
 }

@@ -14,7 +14,7 @@ class Message extends Model
 {
     use HasUuids, SoftDeletes;
     
-    protected $fillable = ['conversation_id', 'user_id', 'type', 'body', 'reply_to_id'];
+    protected $fillable = ['conversation_id', 'user_id', 'type', 'body', 'reply_to_id','edited_at'];
 
     protected $casts = ['edited_at' => 'datetime'];
 

@@ -7,7 +7,11 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Format;
+use Intervention\Image\ImageManager;
 
 class ConversationController extends Controller
 {
@@ -92,19 +96,33 @@ class ConversationController extends Controller
         );
     }
 
-      public function update(Request $request, Conversation $conversation)
-    {
-        Gate::authorize('update',$conversation);
+     public function update(Request $request, Conversation $conversation)
+{
+    Gate::authorize('update', $conversation);
 
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'avatar_path' => ['sometimes', 'nullable', 'string'],
-        ]);
+    $validated = $request->validate([
+        'name' => ['sometimes', 'string', 'max:255'],
+        'avatar' => ['sometimes', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+    ]);
 
-        $conversation->update($validated);
+    $oldAvatarPath = $conversation->avatar_path;
 
-        return response()->json($conversation);
+    if ($request->hasFile('avatar')) {
+        $conversation->avatar_path = $this->storeAvatar($request->file('avatar'));
     }
+
+    if (array_key_exists('name', $validated)) {
+        $conversation->name = $validated['name'];
+    }
+
+    $conversation->save();
+
+    if ($request->hasFile('avatar') && $oldAvatarPath) {
+        Storage::disk('public')->delete($oldAvatarPath);
+    }
+
+    return response()->json($conversation);
+}
 
      public function addParticipant(Request $request, Conversation $conversation)
     {
@@ -131,6 +149,55 @@ class ConversationController extends Controller
             ->update(['left_at' => now()]);
 
         return response()->noContent();
+    }
+
+    public function deleteAvatar(Conversation $conversation)
+{
+    Gate::authorize('update', $conversation);
+
+    if ($conversation->avatar_path) {
+        Storage::disk('public')->delete($conversation->avatar_path);
+        $conversation->update(['avatar_path' => null]);
+    }
+
+    return response()->json($conversation);
+}
+
+public function search(Request $request)
+{
+    $validated = $request->validate([
+        'q' => ['required', 'string', 'min:1', 'max:255'],
+    ]);
+
+    $userId = $request->user()->id;
+    $term = $validated['q'];
+
+    $conversations = $request->user()->conversations()
+        ->whereNull('participants.left_at')
+        ->where(function ($query) use ($term, $userId) {
+            $query->where('conversations.name', 'like', "%{$term}%")
+                ->orWhereHas('participants', function ($q) use ($term, $userId) {
+                    $q->where('user_id', '!=', $userId)
+                        ->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$term}%"));
+                });
+        })
+        ->with(['participants.user'])
+        ->get();
+
+    return response()->json($conversations);
+}
+
+private function storeAvatar($file): string
+    {
+        $manager = ImageManager::usingDriver(Driver::class);
+        $resized = $manager->decodeSplFileInfo($file)
+            ->scaleDown(width: 500, height: 500)
+            ->encodeUsingFormat(Format::JPEG, quality: 80);
+
+        $filename = 'avatars/' . uniqid() . '.jpg';
+        Storage::disk('public')->put($filename, (string) $resized);
+
+        return $filename;
     }
 
 }
