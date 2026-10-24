@@ -3,7 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Foundation\DevCommands;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -23,13 +23,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        DevCommands::artisan('reverb:start', 'reverb');
-        DevCommands::artisan('queue:work', 'queue');
+        Model::preventSilentlyDiscardingAttributes(! app()->isProduction());
 
-        DevCommands::only('server', 'reverb', 'queue');
+        RateLimiter::for('typing', fn (Request $request) =>
+            Limit::perMinute(60)->by($request->user()->id)
+        );
 
-         RateLimiter::for('send-message', function (Request $request) {
-        return Limit::perMinute(30)->by($request->user()->id);
-        });
+        RateLimiter::for('presence', fn (Request $request) =>
+            Limit::perMinute(20)->by($request->user()->id)
+        );
+
+        RateLimiter::for('send-message', fn (Request $request) =>
+            Limit::perMinute(30)->by($request->user()->id)
+        );
     }
 }

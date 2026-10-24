@@ -16,23 +16,34 @@ use Intervention\Image\ImageManager;
 class ConversationController extends Controller
 {
     public function index(Request $request)
-    {
-        $conversations = $request->user()
-            ->conversations()
-            ->with(['messages' => fn ($q) => $q->latest()->limit(1)])
-            ->whereNull('participants.left_at')
-            ->orderByDesc(
-                DB::table('messages')
-                    ->select('created_at')
-                    ->whereColumn('messages.conversation_id', 'conversations.id')
-                    ->latest()
-                    ->limit(1)
-            )
-            ->get();
+{
+    $userId = $request->user()->id;
 
-        return response()->json($conversations);
-    }
+    $conversations = $request->user()
+        ->conversations()
+        ->with(['messages' => fn ($q) => $q->orderByDesc('id')->limit(1)])
+        ->withCount(['messages as unread_count' => function ($q) use ($userId) {
+            $q->where('messages.user_id', '!=', $userId)
+                ->where(function ($q) {
+                    $q->whereNull('participants.last_read_message_id')
+                        ->orWhereColumn('messages.id', '>', 'participants.last_read_message_id');
+                })
+                ->whereDoesntHave('hiddenFor', fn ($h) => $h->where('users.id', $userId));
+        }])
+        ->whereNull('participants.left_at')
+        ->orderByDesc(
+            DB::table('messages')
+                ->select('id')
+                ->whereColumn('messages.conversation_id', 'conversations.id')
+                ->whereNull('deleted_at')
+                ->orderByDesc('id')
+                ->limit(1)
+        )
+        ->orderByDesc('conversations.id')
+        ->get();
 
+    return response()->json($conversations);
+}
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -92,7 +103,7 @@ class ConversationController extends Controller
         Gate::authorize('view',$conversation);
 
         return response()->json(
-            $conversation->load(['participants.user', 'messages' => fn ($q) => $q->latest()->limit(50)])
+            $conversation->load(['participants.user', 'messages' => fn ($q) => $q->orderByDesc('id')->limit(50)])
         );
     }
 

@@ -43,6 +43,8 @@ return [
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                 'timeout' => 2,
+                'connect_timeout' => 1,
             ],
         ],
 

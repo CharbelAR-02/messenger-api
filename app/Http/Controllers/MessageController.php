@@ -26,7 +26,7 @@ class MessageController extends Controller
         $messages = $conversation->messages()
             ->with(['sender', 'attachments', 'reactions.user', 'replyTo'])
             ->whereDoesntHave('hiddenFor', fn ($q) => $q->where('users.id', $request->user()->id))
-            ->latest()
+            ->orderByDesc('id')
             ->cursorPaginate(30);
 
         return response()->json($messages);

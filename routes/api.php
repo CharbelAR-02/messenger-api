@@ -3,7 +3,10 @@
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\ConversationReadController;
+use App\Http\Controllers\ConversationTypingController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\PresenceController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReactionController;
 use Illuminate\Http\Request;
@@ -39,4 +42,12 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::post('/messages/{message}/reactions', [ReactionController::class, 'toggle']);
+
+    Route::post('/conversations/{conversation}/read', ConversationReadController::class);
+
+    Route::post('/conversations/{conversation}/typing', ConversationTypingController::class)
+        ->middleware('throttle:typing');
+
+    Route::post('/presence/heartbeat', [PresenceController::class, 'heartbeat'])
+        ->middleware('throttle:presence');
 });
