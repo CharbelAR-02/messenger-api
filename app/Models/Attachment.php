@@ -13,7 +13,6 @@ class Attachment extends Model
 
     protected $fillable = ['message_id', 'file_path', 'thumbnail_path', 'file_type', 'file_size'];
 
-    protected $appends = ['url', 'thumbnail_url'];
 
     public function getUrlAttribute(): string
     {

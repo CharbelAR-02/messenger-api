@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\MeResource;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +28,7 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return response()->json($user);
+        return new MeResource($user);
     }
 
       public function login(Request $request)
@@ -45,7 +46,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return response()->json(Auth::user());
+        return new MeResource(Auth::user());
     }
 
     public function logout(Request $request)
@@ -59,7 +60,7 @@ class AuthController extends Controller
 
     public function user(Request $request)
     {
-        return response()->json($request->user());
+        return new MeResource($request->user());
     }
 }
 // //session()->regenerate() on both register and login — preventing session fixation attacks.

@@ -16,8 +16,6 @@ class Conversation extends Model
 
     protected $casts = ['type' => 'string'];
 
-    protected $appends = ['avatar_url'];
-
     public function getAvatarUrlAttribute(): ?string
     {
         return $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null;

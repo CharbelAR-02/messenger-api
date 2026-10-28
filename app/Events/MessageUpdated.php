@@ -3,6 +3,7 @@
 namespace App\Events;
 
 use App\Events\Concerns\BroadcastsToParticipants;
+use App\Http\Resources\MessageResource;
 use App\Models\Message;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -25,6 +26,10 @@ class MessageUpdated implements ShouldBroadcast
 
      public function broadcastWith(): array
     {
-        return ['message' => $this->message->load(['sender', 'replyTo', 'attachments'])];
+        return [
+            'message' => (new MessageResource(
+                $this->message->load(['sender', 'replyTo', 'attachments','reactions'])
+            ))->resolve(),
+        ];
     }
 }

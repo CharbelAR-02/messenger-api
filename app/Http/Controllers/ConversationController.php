@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\ConversationResource;
 use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class ConversationController extends Controller
 
     $conversations = $request->user()
         ->conversations()
-        ->with(['messages' => fn ($q) => $q->orderByDesc('id')->limit(1)])
+        ->with(['participants.user','messages' => fn ($q) => $q->orderByDesc('id')->limit(1)])
         ->withCount(['messages as unread_count' => function ($q) use ($userId) {
             $q->where('messages.user_id', '!=', $userId)
                 ->where(function ($q) {
@@ -42,7 +43,7 @@ class ConversationController extends Controller
         ->orderByDesc('conversations.id')
         ->get();
 
-    return response()->json($conversations);
+    return ConversationResource::collection($conversations);
 }
     public function store(Request $request)
     {
@@ -69,7 +70,7 @@ class ConversationController extends Controller
                 ->first();
 
             if ($existing) {
-                return response()->json($existing->load('participants.user'));
+               return new ConversationResource($existing->load('participants.user'));
             }
         }
 
@@ -95,16 +96,14 @@ class ConversationController extends Controller
             return $conversation;
         });
 
-        return response()->json($conversation->load('participants.user'), 201);
+       return new ConversationResource($conversation->load('participants.user'));
     }
 
       public function show(Conversation $conversation)
     {
         Gate::authorize('view',$conversation);
 
-        return response()->json(
-            $conversation->load(['participants.user', 'messages' => fn ($q) => $q->orderByDesc('id')->limit(50)])
-        );
+        return new ConversationResource($conversation->load('participants.user'));
     }
 
      public function update(Request $request, Conversation $conversation)
@@ -132,23 +131,30 @@ class ConversationController extends Controller
         Storage::disk('public')->delete($oldAvatarPath);
     }
 
-    return response()->json($conversation);
+    return new ConversationResource($conversation);
 }
 
      public function addParticipant(Request $request, Conversation $conversation)
     {
-        Gate::authorize('addParticipant',$conversation);
+        Gate::authorize('addParticipant', $conversation);
 
         $validated = $request->validate([
             'user_id' => ['required', 'uuid', 'exists:users,id'],
         ]);
 
-        $conversation->participants()->updateOrCreate(
-            ['user_id' => $validated['user_id']],
-            ['role' => 'member','left_at' => null]
-        );
+        $participant = $conversation->participants()->firstOrNew(['user_id' => $validated['user_id']]);
 
-        return response()->json($conversation->load('participants.user'));
+        // Active members are left untouched: never overwrite a role or a read pointer.
+        if (! $participant->exists || $participant->left_at !== null) {
+            $participant->role = 'member';
+            $participant->left_at = null;
+            $participant->joined_at = now();
+            // Start at the latest message, so history doesn't show up as unread.
+            $participant->last_read_message_id = $conversation->messages()->orderByDesc('id')->value('id');
+            $participant->save();
+        }
+
+        return new ConversationResource($conversation->load('participants.user'));
     }
 
     public function removeParticipant(Conversation $conversation, User $user)
@@ -171,7 +177,7 @@ class ConversationController extends Controller
         $conversation->update(['avatar_path' => null]);
     }
 
-    return response()->json($conversation);
+    return new ConversationResource($conversation);
 }
 
 public function search(Request $request)
@@ -195,7 +201,7 @@ public function search(Request $request)
         ->with(['participants.user'])
         ->get();
 
-    return response()->json($conversations);
+    return ConversationResource::collection($conversations);
 }
 
 private function storeAvatar($file): string

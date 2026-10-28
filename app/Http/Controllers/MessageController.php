@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\MessageDeleted;
 use App\Events\MessageSent;
 use App\Events\MessageUpdated;
+use App\Http\Resources\MessageResource;
 use App\Models\Conversation;
 use App\Models\Message;
 use Illuminate\Http\Request;
@@ -24,12 +25,12 @@ class MessageController extends Controller
         Gate::authorize('viewAny', [Message::class, $conversation]);
 
         $messages = $conversation->messages()
-            ->with(['sender', 'attachments', 'reactions.user', 'replyTo'])
+            ->with(['sender', 'attachments', 'reactions', 'replyTo'])
             ->whereDoesntHave('hiddenFor', fn ($q) => $q->where('users.id', $request->user()->id))
             ->orderByDesc('id')
             ->cursorPaginate(30);
 
-        return response()->json($messages);
+        return MessageResource::collection($messages);
     }
 
   public function store(Request $request, Conversation $conversation)
@@ -83,7 +84,7 @@ class MessageController extends Controller
     });
     broadcast(new MessageSent($message))->toOthers();
 
-    return response()->json($message->load(['sender', 'replyTo', 'attachments']), 201);
+    return new MessageResource($message->load(['sender', 'replyTo', 'attachments','reactions']));
   }
 
    public function update(Request $request, Message $message)
@@ -109,7 +110,7 @@ class MessageController extends Controller
 
         broadcast(new MessageUpdated($message))->toOthers();
 
-        return response()->json($message);
+        return new MessageResource($message->load(['sender', 'replyTo', 'attachments','reactions']));
     }
 
     public function destroy(Message $message)

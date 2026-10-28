@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Resources\MeResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -54,7 +55,7 @@ class ProfileController extends Controller
             Storage::disk('public')->delete($oldAvatarPath);
         }
 
-        return response()->json($user);
+        return new MeResource($user);
     }
 
       public function deleteAvatar(Request $request)
@@ -66,6 +67,6 @@ class ProfileController extends Controller
             $user->update(['avatar_path' => null]);
         }
 
-        return response()->json($user);
+        return new MeResource($user);
     }
 }

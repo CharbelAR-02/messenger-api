@@ -35,8 +35,6 @@ class User extends Authenticatable
         ];
     }
 
-    protected $appends = ['avatar_url'];
-
     public function getAvatarUrlAttribute(): ?string
 {
     return $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null;

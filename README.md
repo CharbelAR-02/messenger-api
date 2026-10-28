@@ -32,6 +32,7 @@ A real-time messaging backend built with **Laravel 13**. It supports 1-to-1 and 
 - Sanctum cookie-based SPA authentication with CSRF protection
 - Laravel Policies for every protected action
 - Per-user rate limiting on sending, typing, and presence endpoints
+- Explicit API Resources for secure, consistent response and event data
 
 ## Tech stack
 
@@ -64,6 +65,8 @@ A real-time messaging backend built with **Laravel 13**. It supports 1-to-1 and 
 **Data integrity.** Writes that touch several tables run in a transaction. Mass assignment is protected with explicit `$fillable` lists, and fields that represent system state (roles, read pointers, presence) are set only in server code. In non-production environments Eloquent throws when an attribute is silently discarded.
 
 **Best-effort delivery, REST as the source of truth.** Broadcasts are queued and can be missed during an outage, so a client should refetch after reconnecting. Messages are always persisted before they are broadcast.
+
+**Consistent REST and WebSocket responses.** Both use the same API Resources for consistent message shapes, while dedicated resources keep private fields and user-specific settings out of shared broadcasts.
 
 ## Data model
 
@@ -143,13 +146,13 @@ All routes are under `/api` and, except register and login, require an authentic
 | GET | `/user` | Current user |
 | PATCH | `/profile` | Update name and avatar |
 | DELETE | `/profile/avatar` | Remove avatar |
-| GET | `/conversations` | List my conversations with `unread_count` and latest message |
+| GET | `/conversations` | List my conversations with participants, `unread_count`, my membership, and the latest message |
 | POST | `/conversations` | Create a private or group conversation |
 | GET | `/conversations/search?q=` | Search by group name or other participant's name |
-| GET | `/conversations/{id}` | View a conversation (members only) |
+| GET | `/conversations/{id}` | View a conversation and its participants (members only) |
 | PATCH | `/conversations/{id}` | Rename / set avatar (group admins) |
 | DELETE | `/conversations/{id}/avatar` | Remove group avatar (group admins) |
-| POST | `/conversations/{id}/participants` | Add a member (group admins) |
+| POST | `/conversations/{id}/participants` | Add or re-add a member (group admins) |
 | DELETE | `/conversations/{id}/participants/{user}` | Leave, or remove a member (admins) |
 | GET | `/conversations/{id}/messages` | Cursor-paginated message history |
 | POST | `/conversations/{id}/messages` | Send text / image / file / voice (30 per minute) |
@@ -163,6 +166,7 @@ All routes are under `/api` and, except register and login, require an authentic
 | POST | `/presence/heartbeat` | Report that I am active (20 per minute) |
 
 Clients also use `GET /sanctum/csrf-cookie` for CSRF setup and `POST /broadcasting/auth` for private-channel authorization.
+201 for a new message, a new conversation, and an added reaction; 200 when an existing 1-to-1 is returned; 204 for deletes, read pointer, typing, and heartbeat.
 
 ## Real-time events
 
@@ -170,8 +174,8 @@ All events are delivered on the recipient's private channel `user.{id}`.
 
 | Event | Payload | Delivery |
 |---|---|---|
-| `MessageSent` | message with sender, reply target, attachments | queued |
-| `MessageUpdated` | updated message | queued |
+| `MessageSent` | message (same shape as the REST message resource) | queued |
+| `MessageUpdated` | message (same shape as the REST message resource) | queued |
 | `MessageDeleted` | `message_id`, `conversation_id` | queued |
 | `ReactionToggled` | `message_id`, `user_id`, `emoji`, `status` (`added` or `removed`) | queued |
 | `MessagesRead` | `conversation_id`, `user_id`, `last_read_message_id` | queued |
@@ -244,7 +248,6 @@ The default `composer run dev` script does not start Reverb or the scheduler, so
 ## Roadmap and known limitations
 
 - **Automated tests.** The repository currently contains only the framework's example tests. Behavior has been verified manually, including permission edge cases. Pest Feature tests for the Policies, read pointer, unread counts, and event dispatching are planned.
-- **Response shaping.** Planned: API Resources to control exactly which fields each response exposes (participant emails, for example).
 - **React client** for the API.
 - **Next features:** @mentions, link previews, full-text message search, pin / mute / archive (the columns already exist), email notifications for unread messages, block and report.
-- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat; no end-to-end encryption; no voice or video calls (WebRTC is out of scope).
+- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat; signed attachment URLs expire after 30 minutes(client should refetch after expiry); no end-to-end encryption; no voice or video calls (WebRTC is out of scope).

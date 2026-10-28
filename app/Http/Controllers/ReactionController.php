@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Events\ReactionToggled;
+use App\Http\Resources\ReactionResource;
 use App\Models\Message;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +50,6 @@ class ReactionController extends Controller
             'added'
         ))->toOthers();
 
-        return response()->json(['status' => 'added', 'reaction' => $reaction->load('user')], 201);
+        return response()->json(['status' => 'added', 'reaction' => (new ReactionResource($reaction))->resolve()], 201);
     }
 }
