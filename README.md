@@ -262,4 +262,4 @@ It covers conversation and message authorization (Policies, including removed me
 
 - **React client** for the API.
 - **Next features:** @mentions, link previews, full-text message search, pin / mute / archive (the columns already exist), email notifications for unread messages, block and report.
--- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat, and "online" means the app is open in a visible tab; signed attachment URLs expire after 30 minutes (clients should refetch after expiry); members added to a group can read earlier messages; no end-to-end encryption; no voice or video calls (WebRTC is out of scope).
+- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat, and "online" means the app is open in a visible tab; signed attachment URLs expire after 30 minutes (clients should refetch after expiry); members added to a group can read earlier messages; no end-to-end encryption; no voice or video calls (WebRTC is out of scope).
