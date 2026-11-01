@@ -2,6 +2,11 @@
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
+use App\Models\Conversation;
+use App\Models\Message;
+use App\Models\Participant;
+use App\Models\User;
+use Illuminate\Broadcasting\PrivateChannel;
 
 /*
 |--------------------------------------------------------------------------
@@ -15,7 +20,7 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)
- // ->use(RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -29,9 +34,6 @@ pest()->extend(TestCase::class)
 |
 */
 
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
 
 /*
 |--------------------------------------------------------------------------
@@ -44,7 +46,61 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function makeUser(array $attributes = []): User
 {
-    // ..
+    return User::factory()->create($attributes);
+}
+
+// $admin becomes the admin; $members are plain members.
+function makeConversation(User $admin, array $members = [], string $type = 'group'): Conversation
+{
+    $conversation = Conversation::create([
+        'type' => $type,
+        'name' => $type === 'group' ? 'Test group' : null,
+        'created_by' => $admin->id,
+    ]);
+
+    $conversation->participants()->create(['user_id' => $admin->id, 'role' => 'admin']);
+
+    foreach ($members as $member) {
+        $conversation->participants()->create(['user_id' => $member->id, 'role' => 'member']);
+    }
+
+    return $conversation;
+}
+
+function makeMessage(Conversation $conversation, User $sender, array $attributes = []): Message
+{
+    // Read pointers compare UUIDv7 ids, so no two messages may share a millisecond.
+    usleep(2000);
+
+    return $conversation->messages()->create(array_merge([
+        'user_id' => $sender->id,
+        'type' => 'text',
+        'body' => 'hello',
+    ], $attributes));
+}
+
+function participantOf(Conversation $conversation, User $user): Participant
+{
+    return Participant::where('conversation_id', $conversation->id)
+        ->where('user_id', $user->id)
+        ->firstOrFail();
+}
+
+function setReadPointer(Conversation $conversation, User $user, ?Message $message): void
+{
+    Participant::where('conversation_id', $conversation->id)
+        ->where('user_id', $user->id)
+        ->update(['last_read_message_id' => $message?->id]);
+}
+
+function userChannel(User $user): string
+{
+    return (string) new PrivateChannel("user.{$user->id}");
+}
+
+function channelNames(array $channels): array
+{
+    return array_map(fn ($channel) => (string) $channel, $channels);
 }

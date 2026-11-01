@@ -2,7 +2,7 @@
 
 A real-time messaging backend built with **Laravel 13**. It supports 1-to-1 and group conversations, text/image/file/voice messages, reactions, read receipts, typing indicators, and live online presence, delivered over WebSockets with **Laravel Reverb**.
 
-> **Status:** the backend API is feature-complete for its first scope. A React client is planned. Every endpoint, including the negative authorization cases, has been verified manually with an API client; automated tests are on the roadmap (see [Roadmap](#roadmap-and-known-limitations)).
+> **Status:** the backend API is feature-complete for its first scope and covered by an automated test suite (77 Pest feature tests). A React client is planned.
 
 ## Features
 
@@ -245,9 +245,21 @@ The default `composer run dev` script does not start Reverb or the scheduler, so
 2. send credentials with every request, and echo the `XSRF-TOKEN` cookie back as an `X-XSRF-TOKEN` header (with axios, `withCredentials: true` and `withXSRFToken: true`),
 3. connect Laravel Echo with the `reverb` broadcaster, authorize private channels through `/broadcasting/auth` using the same credentialed HTTP client, and subscribe to `user.{id}`.
 
+## Testing
+
+The suite uses [Pest](https://pestphp.com) and runs against a dedicated MySQL database, so it exercises the same SQL as production. Host and credentials come from your `.env`, while `phpunit.xml` points the connection at `messenger_testing`, so the suite never touches your development database.
+
+```bash
+# once: create the test database
+mysql -u root -e "CREATE DATABASE messenger_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+php artisan test
+```
+
+It covers conversation and message authorization (Policies, including removed members and non-members), the read pointer and unread counts, which users each event is broadcast to, typing and presence behavior, attachment uploads and signed-URL security, rate limits, and the shape of the main responses and the live message payload, so private fields cannot leak back in.
+
 ## Roadmap and known limitations
 
-- **Automated tests.** The repository currently contains only the framework's example tests. Behavior has been verified manually, including permission edge cases. Pest Feature tests for the Policies, read pointer, unread counts, and event dispatching are planned.
 - **React client** for the API.
 - **Next features:** @mentions, link previews, full-text message search, pin / mute / archive (the columns already exist), email notifications for unread messages, block and report.
-- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat; signed attachment URLs expire after 30 minutes(client should refetch after expiry); no end-to-end encryption; no voice or video calls (WebRTC is out of scope).
+-- **Known limits:** delivery is best-effort (clients refetch after reconnecting); a user is shown offline 60 to 90 seconds after their last heartbeat, and "online" means the app is open in a visible tab; signed attachment URLs expire after 30 minutes (clients should refetch after expiry); members added to a group can read earlier messages; no end-to-end encryption; no voice or video calls (WebRTC is out of scope).
